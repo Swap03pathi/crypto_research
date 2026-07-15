@@ -162,10 +162,21 @@ a personal Gmail; pivot to "assignment" instead of a real conversation.
 | Malware lure | **`Fullstack.zip`** | Google Drive |
 | Drive file ID | **`1ZyhrpzoAtWukClVpgCAyEK-KgHMvpl2J`** | Public "anyone with link" |
 | Drive owner account | **`cool9571791@gmail.com`** | Personal Gmail (not corporate) |
-| Sample size | **62,508 bytes** (stored/uncompressed) | Source‑only project (no `node_modules`) |
-| **SHA‑256** | **`4bec2b8443bd1600a2239cdb4d77fc9e252785fa144b00f81dd3a25e73ec285e`** | `Fullstack.zip` |
-| C2 / exfil endpoints | **[PENDING — fill from static analysis]** | e.g., jsonkeeper/jsonsilo/npoint.io/vercel.app/etc. |
-| Targeted wallets | **[PENDING]** | Typically MetaMask/Phantom (BeaverTail) |
+| Sample size | **62,508 bytes** (stored/uncompressed) | Ships a full `.git/` repo (source in git objects) |
+| **`Fullstack.zip` SHA‑256** | **`4bec2b8443bd1600a2239cdb4d77fc9e252785fa144b00f81dd3a25e73ec285e`** | Container |
+| **Malicious files** | `.git/hooks/post-checkout`, `.git/hooks/pre-commit` | Byte‑identical, 500 B each; the *only* malicious code |
+| **Malicious hook SHA‑256** | `f126186fe14d02e0d07f14d1ad3b0653abaaae9e099223dbae7513796452054f` | Both hooks |
+| **C2 endpoint (IP)** | **`216.126.239.166`** | Hard‑coded, plain HTTP, no domain |
+| **Payload URLs** | `http://216.126.239.166/728/728m` (macOS) · `/728l` (Linux) · `/728w` (Windows) | `curl … \| sh` / `wget … \| sh` / `\| cmd` |
+| **Attacker git identity** | **`wondev_mum <wondev.mum@gmail.com>`** | Author/committer on all 3 commits (2026‑07‑14, UTC‑0400) |
+| Lure PDF SHA‑256 | `ed517a74a9efc7a79ed4889b7c7ce36829824704fcf672bb915d0e934f589c2d` | `Fullstack_Home_Task.pdf` (decoy brief) |
+| Targeted wallets | Decided by remote second stage (not fetched) | Campaign norm: MetaMask/Phantom via BeaverTail |
+
+> **Delivery‑method note:** unlike the classic `postinstall`/`.config.env`+`atob()` placement anticipated in
+> §7, this sample hides the loader in **git hooks** (`post-checkout`/`pre-commit`) that fire on the
+> `git checkout`/`git commit` steps the brief tells you to run. Shipping a full `.git/` inside the ZIP is the
+> only way to plant live hooks (git never transmits hooks over clone/fetch). This is a documented evolution of
+> the same campaign ("TaskJacker"). Full write‑up: [`fullstack-zip-static-analysis.md`](fullstack-zip-static-analysis.md).
 
 ---
 
@@ -296,6 +307,18 @@ grep -rElc '.{1000,}' .            # padded/obfuscated files (very long lines)
 cat .git/config 2>/dev/null; git log --pretty="%an <%ae> %ad" 2>/dev/null | head    # identity leak
 grep -rniE "/Users/|/home/|C:\\\\Users\\\\" . | head -30                            # embedded dev paths
 ```
+**⚠️ If the sample ships a `.git/` directory (as `Fullstack.zip` did), inspect git hooks FIRST — plain
+`grep` misses them, and the source lives in git objects, not on disk:**
+```bash
+# Non-sample hooks are the red flag (weaponized post-checkout / pre-commit)
+ls -la .git/hooks | grep -v '\.sample'
+grep -RniE 'curl|wget|\| ?sh|\| ?cmd|http://|https://' .git/hooks 2>/dev/null
+# Read source that only exists in git objects (never checkout/commit/pull inside it!)
+git -C . log --all --pretty="%an <%ae> %ad %s"
+git -C . ls-tree -r --name-only --branches | head
+# Check the payload can't have set global persistence (should be empty)
+git config --global --get core.hooksPath; git config --global --get init.templateDir
+```
 **Deep read‑only analysis:** in `~/scam-eval/extracted`, run `/analyze-for-swapnil .` (decline any offer to
 run/install/"test").
 
@@ -312,17 +335,29 @@ run/install/"test").
   (`4bec2b8443bd1600a2239cdb4d77fc9e252785fa144b00f81dd3a25e73ec285e`, 62,508 bytes).
 - Matched the whole pattern to the documented "Contagious Interview" campaign and to B1's own scam notice.
 
-**Pending (fill in after static analysis):**
-- `clamscan` result; `unzip -l` listing; `package.json` lifecycle scripts.
-- Confirmed obfuscation / `atob` / `new Function` / `process.env` exfiltration lines.
-- **C2 / exfil endpoints** and any **wallet addresses** (→ complete the IOC table §6).
-- Any **developer identity leak** (`.git` author email, embedded `/Users/<name>` paths).
+**Static analysis — COMPLETE** (see [`fullstack-zip-static-analysis.md`](fullstack-zip-static-analysis.md)
+and [`artifacts/claude-analysis.md`](artifacts/claude-analysis.md)):
+- **Verdict: 🔴 MALICIOUS (high confidence)** — RCE dropper via **weaponized git hooks**
+  (`.git/hooks/post-checkout` + `pre-commit`), a documented git‑hook variant of Contagious Interview
+  ("TaskJacker"). The React+Express "Wallet Watchlist" app and the PDF brief are **decoys**.
+- **C2:** `216.126.239.166` (plain HTTP); payload paths `/728/728m` (macOS), `/728l` (Linux), `/728w` (Win),
+  each piped straight into `sh`/`cmd`.
+- **Attacker identity leak:** git author **`wondev_mum <wondev.mum@gmail.com>`**; 3 commits within ~2 minutes
+  on 2026‑07‑14 (UTC‑0400) — a throwaway kit.
+- No `postinstall`/obfuscation/`atob`/`process.env` exfil in source (the app is clean bait); credential/wallet
+  theft is in the **remote second stage** (not fetched, so no local wallet IOCs).
+- IOC table (§6) and report templates (§12) updated accordingly.
+
+**Still open (optional):** the second‑stage payload (`/728/*`) was deliberately **not** fetched, so its exact
+capabilities/wallet targets are inferred from campaign norms (BeaverTail/InvisibleFerret) rather than observed.
 
 ---
 
 ## 12. Reporting templates
 
-> Fill the `[PASTE]` fields from the completed analysis (SHA‑256 already known).
+> IOCs below are finalized from the completed static analysis. Confirmed indicators to include in every
+> report: **C2 `216.126.239.166`** (paths `/728/728m|l|w`), **attacker `wondev.mum@gmail.com`** (`wondev_mum`),
+> malicious files `.git/hooks/post-checkout` + `pre-commit`, container SHA‑256 `4bec2b84…285e`.
 
 ### LinkedIn (report the profile)
 ```
@@ -367,7 +402,8 @@ deliberate no-shows, I was sent a "take-home assignment" — Fullstack.zip — v
 (file ID 1ZyhrpzoAtWukClVpgCAyEK-KgHMvpl2J; owner cool9571791@gmail.com;
 SHA-256 4bec2b8443bd1600a2239cdb4d77fc9e252785fa144b00f81dd3a25e73ec285e). Analysis indicates trojanized
 code matching the DPRK "Contagious Interview" campaign (BeaverTail/InvisibleFerret) intended to steal
-credentials and cryptocurrency wallets. I did NOT run the file. C2/exfil: [PASTE]. No financial loss.
+credentials and cryptocurrency wallets. I did NOT run the file. C2: 216.126.239.166 (paths /728/728m|l|w);
+attacker git identity wondev_mum <wondev.mum@gmail.com>. No financial loss.
 ```
 
 ### Hostinger abuse (abuse@hostinger.com)
