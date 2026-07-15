@@ -4,8 +4,8 @@
 > This document **completes the "static code analysis pending"** item in that dossier and fills the
 > `[PENDING]` fields in its **§6 IOC table** and **§11 Findings**.
 >
-> **Analysis date:** 2026‑07‑15 · **Method:** static, read‑only only. The payload was **never executed**
-> and the C2 server was **never contacted**.
+> **Analysis date:** 2026‑07‑15 · **Last updated:** 2026‑07‑15 · **Method:** static, read‑only only. The
+> payload was **never executed** and the C2 server was **never contacted**.
 
 ---
 
