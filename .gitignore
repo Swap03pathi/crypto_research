@@ -1,0 +1,23 @@
+# SECURITY: never commit malware samples, extracted payloads, or archives to this repo.
+# Only sanitized ANALYSIS OUTPUT (text/markdown) belongs here.
+*.zip
+*.tgz
+*.tar
+*.tar.gz
+assignment.zip
+Fullstack.zip
+scam-eval/
+**/extracted/
+**/sample/
+**/samples/
+# decoded / second-stage payloads (keep only as inert quoted snippets inside markdown)
+**/payload.*
+**/second-stage.*
+**/*.decoded
+# common executable/binary artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+*.node
